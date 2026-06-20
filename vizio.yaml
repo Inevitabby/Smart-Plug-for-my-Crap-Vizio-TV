@@ -1,0 +1,27 @@
+substitutions:
+  name: vizio
+  friendly_name: Vizio TV Plug
+  sub_threshold: "15"
+
+packages:
+  kauf_plug: github://KaufHA/PLF12/kauf-plf12.yaml
+
+http_request:
+  verify_ssl: false
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: !secret plug_ip
+    gateway: !secret wifi_gateway
+    subnet: 255.255.255.0
+
+binary_sensor:
+  - id: !extend in_use
+    on_press:
+      then:
+        - http_request.post: !secret tv_on_url
+    on_release:
+      then:
+        - http_request.post: !secret tv_off_url
