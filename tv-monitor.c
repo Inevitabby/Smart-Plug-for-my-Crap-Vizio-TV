@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <linux/limits.h>
 #include "config.h"
 
 #define PORT 47303
@@ -13,17 +14,50 @@
 
 const char *http_ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 
-static void run_kscreen(const char *arg) {
+static char script_path[PATH_MAX];
+
+static void init_script_path(void) {
+    char self[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", self, sizeof(self) - 1);
+    if (len < 0) {
+        fprintf(stderr, "readlink /proc/self/exe failed\n");
+        exit(1);
+    }
+    self[len] = '\0';
+
+    char *slash = strrchr(self, '/');
+    if (!slash) {
+        fprintf(stderr, "unexpected path format\n");
+        exit(1);
+    }
+    *(slash + 1) = '\0';
+    snprintf(script_path, sizeof(script_path), "%stv.sh", self);
+}
+
+// static void run_tv(const char *arg) {
+//     pid_t pid = fork();
+//     if (pid == 0) {
+//         setsid();
+//         char *args[] = { script_path, (char *)arg, NULL };
+//         execvp(script_path, args);
+//         _exit(1);
+//     }
+// }
+static void run_tv(const char *arg) {
+    fprintf(stderr, "run_tv called with: %s\n", arg);
+    fprintf(stderr, "script_path: %s\n", script_path);
+    fflush(stderr);
     pid_t pid = fork();
     if (pid == 0) {
         setsid();
-        char *args[] = {"kscreen-doctor", (char *)arg, NULL};
-        execvp("kscreen-doctor", args);
+        char *args[] = { script_path, (char *)arg, NULL };
+        execvp(script_path, args);
+        perror("execvp failed");
         _exit(1);
     }
 }
 
-static int query_plug() {
+static int query_plug(void) {
     int fd;
     struct sockaddr_in addr;
     char buf[BUFFER_SIZE];
@@ -49,32 +83,30 @@ static int query_plug() {
     if (n <= 0) return -1;
     buf[n] = '\0';
 
-    if (strstr(buf, "\"ON\"")) return 1;
+    if (strstr(buf, "\"ON\""))  return 1;
     if (strstr(buf, "\"OFF\"")) return 0;
     return -1;
 }
 
-int main() {
+int main(void) {
+    init_script_path();
+
     int server_fd, client_fd;
     struct sockaddr_in address;
     int opt = 1;
     socklen_t addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
 
-    // Query plug state on startup
     int state = query_plug();
-    if (state == 1)
-        run_kscreen("output.HDMI-A-4.enable");
-    else if (state == 0)
-        run_kscreen("output.HDMI-A-4.disable");
-    // if -1 (error/unreachable), do nothing and let events drive state
+    if (state == 1)      run_tv("on");
+    else if (state == 0) run_tv("off");
 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) return 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) return 1;
 
-    address.sin_family = AF_INET;
+    address.sin_family      = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    address.sin_port        = htons(PORT);
 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) return 1;
     if (listen(server_fd, 3) < 0) return 1;
@@ -92,10 +124,8 @@ int main() {
             send(client_fd, http_ok, strlen(http_ok), 0);
             close(client_fd);
 
-            if (strstr(buffer, "POST /tv_on"))
-                run_kscreen("output.HDMI-A-4.enable");
-            else if (strstr(buffer, "POST /tv_off"))
-                run_kscreen("output.HDMI-A-4.disable");
+            if      (strstr(buffer, "POST /tv_on"))  run_tv("on");
+            else if (strstr(buffer, "POST /tv_off")) run_tv("off");
         } else {
             close(client_fd);
         }
