@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=VacuumTube (TV)
+Comment=Launch VacuumTube on TV
+Exec=launch-to-tv --wayland --app /usr/bin/flatpak run --device=dri --branch=stable --arch=x86_64 --command=startvacuumtube --file-forwarding rocks.shy.VacuumTube
+Icon=rocks.shy.VacuumTube
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;

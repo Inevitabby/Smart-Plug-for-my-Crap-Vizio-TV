@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Steam Big Picture (TV)
+Comment=Launch Steam Big Picture on TV
+Exec=launch-to-tv --steam --app steam -tenfoot
+Icon=steam
+Terminal=false
+Type=Application
+Categories=Game;

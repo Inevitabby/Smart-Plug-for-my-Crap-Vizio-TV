@@ -1,0 +1,63 @@
+#!/bin/env bash
+set -e
+
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+PLUGIN_NAME="launch-to-tv"
+PLUGIN_PATH="$SCRIPT_DIR/launch-to-tv.js"
+OUTPUT="HDMI-A-4"
+WIDTH=1920
+HEIGHT=1080
+WAYLAND=0
+STEAM=0
+
+usage() {
+    echo "Usage: $0 [options] --app <command...>" >&2
+    echo "  --output <name>   Output connector name (default: HDMI-A-4)" >&2
+    echo "  --width  <px>     Gamescope output width (default: 1920)" >&2
+    echo "  --height <px>     Gamescope output height (default: 1080)" >&2
+    echo "  --wayland         Expose Wayland socket (for Wayland-native apps)" >&2
+    echo "  --steam           Enable Steam integration (-e flag)" >&2
+    echo "  --app <command>   App to launch (consumes rest of args)" >&2
+    exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output)  OUTPUT="$2"; shift 2 ;;
+        --width)   WIDTH="$2";  shift 2 ;;
+        --height)  HEIGHT="$2"; shift 2 ;;
+        --wayland) WAYLAND=1;   shift ;;
+        --steam)   STEAM=1;     shift ;;
+        --app)     shift; APP=("$@"); break ;;
+        *) usage ;;
+    esac
+done
+
+[[ ${#APP[@]} -eq 0 ]] && usage
+
+cat > "$PLUGIN_PATH" << JSEOF
+var handler = workspace.windowAdded.connect(function(window) {
+    if (window.resourceClass === "gamescope") {
+        var screens = workspace.screens;
+        for (var i = 0; i < screens.length; i++) {
+            if (screens[i].name === "$OUTPUT") {
+                workspace.sendClientToScreen(window, screens[i]);
+                workspace.windowAdded.disconnect(handler);
+                break;
+            }
+        }
+    }
+});
+JSEOF
+
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$PLUGIN_PATH" "$PLUGIN_NAME"
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start
+
+GAMESCOPE_ARGS=(-f -W "$WIDTH" -H "$HEIGHT" -w "$WIDTH" -h "$HEIGHT")
+[[ $STEAM   -eq 1 ]] && GAMESCOPE_ARGS+=(-e)
+[[ $WAYLAND -eq 1 ]] && GAMESCOPE_ARGS+=(--expose-wayland)
+
+gamescope "${GAMESCOPE_ARGS[@]}" -- "${APP[@]}" &
+
+sleep 30
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "$PLUGIN_NAME"
