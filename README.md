@@ -1,47 +1,52 @@
 # Smart Plug for my Crap Vizio TV
 
-We all know what happens when you give a mouse a cookie, but what about when you give me a crappy TV that doesn't support HDMI HPD and whose on/off state is totally invisible to your computer?
+My crap Vizio TV doesn't support HDMI HPD and there's literally no way in software to tell whether the TV is on or off.
 
-The answer, dear reader, is simple.
+I checked dmesg and Pipewire, I tried probing it on the network, I tried hooking a Gen 1 Tinkerboard running an extremely optimized DietPi setup to the TV's USB port (to serve as a beacon, because the USB port briefly got power on power-on)[^dietpi] nothing worked. 
 
-You get a smart plug, compile firmware that makes it send a HTTP POST to my computer when the power draw crosses 15W, and write a C program for my PC that consumes the notifications and calls `kscreen-doctor output.HDMI-A-4.enable` and `kscreen-doctor output.HDMI-A-4.disable` so KDE can enable and disable the monitor.
+[^dietpi]: it frequently browned-out or didn't boot fast-enough
 
-All of this, to avoid having to press `Meta+P` and clicking a button to manually enable and disable the monitor.
+After wasting several hours I just went with the obvious solution and bought a 12 dollar smart plug.
 
 # How It Works
 
 ## The Plug
 
-The smart plug is a [KAUF PLF12](https://kaufha.com/plf12), a power monitoring plug that runs ESPHome. The firmware is configured to watch a binary sensor (`in_use`) that trips when power draw exceeds a configurable wattage threshold (`sub_threshold`). When the sensor trips or clears, the plug fires a HTTP POST to the workstation.
+The smart plug is a [KAUF PLF12](https://kaufha.com/plf12), a power monitoring plug that runs ESPHome. The binary sensor `in_use` trips when power draw exceeds a configurable wattage threshold (`sub_threshold`).
 
-`vizio.yaml` is built on top of KaufHA's official package, so it retains all the stock KAUF functionality (web UI, Home Assistant integration, LED config, etc.) while adding the HTTP request behavior on top via `!extend`.
+A simple firmware tweak was made to make the plug fire a HTTP POST when `in_use` tripped.
 
 ## Power Profiling
 
-TV off is 0.393W +/- 0.074W and TV on is 33.500W +/- 12.516W (spiking to 91W when turning on). You'd think 3W would be a fine threshold, and it was, until I discovered the TV randomly spikes to 10.281W +/- 0.146W after powering off because God hates me. So `sub_threshold` is 15W.
+TV off is 0.393W +/- 0.074W and TV on is 33.500W +/- 12.516W (spiking to 91W when turning on).
 
-`profiler.sh` samples the plug's power sensor 150 times over 5 minutes and prints a running mean and standard deviation. I used it to figure out the above numbers.
+Just kidding, TV also sometimes randomly spikes to 10.281W +/- 0.146W after powering off because (???)[^fire]. So `sub_threshold` is 15W.
+
+[^fire]: If I perish in an electrical fire, you may point and laugh at this footnote.
 
 ## The Server
 
-`tv-monitor.c` is a minimal HTTP server that listens for the plug's POST requests and calls `kscreen-doctor` via `fork()`/`execvp()`. I start it with KDE autostart so that it inherits the user session environment, which is necessary for `kscreen-doctor` to actually see the display.
+`tv-monitor.c` is a minimal HTTP server that listens for the plug's POST requests and calls `kscreen-doctor`.
 
-On startup, it queries the plug's REST API to sync initial monitor state in case the workstation was started while the TV was already on. If the plug is unreachable at startup, it does nothing and lets the next real event correct state. Graceful degradation, very professional, I am a very serious engineer.
+On startup, it queries the plug's REST API to sync initial monitor state (in case the workstation was started while the TV was already on). If the plug is unreachable at startup, it does nothing and lets the next real event correct state.
 
-The reason I'm not using Python is because it feels icky to spend 20MB of RAM 24/7/365 to handle an event that only happens a few times a week. I am very technologically hygieneful. Don't look at the ten billion random Bash scripts in my KDE autostart.
+I initially tried to make the server be like an all-in-one thing to like start Steam Big Picture or Vacuumtube automatically but it was very complicated and unstable[^wayland] so I decided to split all that stuff into separate .desktop files instead (see: `launch_scripts/`).
+
+[^wayland]: Due to Wayland's security model hating usability, humanity, baby bunnies, and cats.
 
 # Files
 
-- `profiler.sh`: Samples power draw 150 times over 5 minutes, calculates mean and standard deviation. Requires `profiler_config.sh` (see example).
+- `profiler.sh`: Samples power draw 150 times over 5 minutes and calculates running mean and standard deviation. Requires `profiler_config.sh` (see example).
 - `vizio.yaml`: ESPHome firmware config for the plug.
 - `tv-monitor.c`: Workstation HTTP server.
+	- I start it with KDE autostart so that it inherits the user session environment
 - `Makefile`: Builds the C program and compiles the firmware in one shot.
 
 Secrets:
 
-- `config.h.example`: Copy to `config.h` and fill in your workstation IP. Gitignored.
-- `secrets.yaml.example`: Copy to `secrets.yaml` and fill in your network details. Gitignored.
-- `profiler_config.sh.example`: Copy to `profiler_config.sh` and fill in your plug IP. Gitignored.
+- `config.h.example`: Copy to `config.h` and fill in your workstation IP.
+- `secrets.yaml.example`: Copy to `secrets.yaml` and fill in your network details.
+- `profiler_config.sh.example`: Copy to `profiler_config.sh` and fill in your plug IP.
 
 # Reuse
 
