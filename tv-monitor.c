@@ -63,10 +63,12 @@ int main() {
 
     // Query plug state on startup
     int state = query_plug();
-    if (state == 1)
+    if (state == 1) {
         run_kscreen("output.HDMI-A-4.enable");
-    else if (state == 0)
+    } else if (state == 0) {
         run_kscreen("output.HDMI-A-4.disable");
+        run_kscreen("output.DP-4.enable");
+    }
     // if -1 (error/unreachable), do nothing and let events drive state
 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) return 1;
@@ -92,10 +94,12 @@ int main() {
             send(client_fd, http_ok, strlen(http_ok), 0);
             close(client_fd);
 
-            if (strstr(buffer, "POST /tv_on"))
+            if (strstr(buffer, "POST /tv_on")) {
                 run_kscreen("output.HDMI-A-4.enable");
-            else if (strstr(buffer, "POST /tv_off"))
+            } else if (strstr(buffer, "POST /tv_off")) {
                 run_kscreen("output.HDMI-A-4.disable");
+                run_kscreen("output.DP-4.enable");
+            }
         } else {
             close(client_fd);
         }
