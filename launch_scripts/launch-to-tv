@@ -35,6 +35,8 @@ done
 
 [[ ${#APP[@]} -eq 0 ]] && usage
 
+kscreen-doctor output.HDMI-A-4.enable
+
 cat > "$PLUGIN_PATH" << JSEOF
 var handler = workspace.windowAdded.connect(function(window) {
     if (window.resourceClass === "gamescope") {
