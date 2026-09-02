@@ -1,12 +1,17 @@
-# Smart Plug for my Crap Vizio TV
+<div align="center">
+	<h2>Smart Plug for my Crap Vizio TV</h2>
+	<p>or, How I Learned to Stop Worrying and Love EDID Spoofing</p>
+</div>
 
-My Vizio TV doesn't support HDMI HPD, so there's no clean way in software to tell whether it's on or off.
+> *Part of a larger self-hosted setup you can read too much about [here](https://inevitabby.com/blog/productivity-tools/).*
 
-I ran through the usual diagnostics first (dmesg, PipeWire, probing it on the network), then escalated to increasingly unhinged ideas, including wiring a Gen 1 Tinkerboard running an extremely optimized DietPi setup into the TV's USB port to act as a power-on beacon[^dietpi]. Eventually I did the sane thing and bought a $12 smart plug.
+My ancient Vizio TV doesn't support HDMI HPD, so there's no clean way in software to tell whether it's on or off.
+
+I ran through the usual diagnostics first (dmesg, PipeWire, probing it on the network), then escalated to increasingly unhinged ideas, including wiring a Gen 1 Tinkerboard running an extremely optimized DietPi setup into the TV's USB port to act as a power-on beacon[^dietpi].
+
+Eventually I did the sane thing and bought a $12 smart plug.
 
 [^dietpi]: It frequently browned-out or didn't boot fast-enough; the TV's USB port turned out to be extremely spotty
-
-After wasting several hours I just went with the obvious solution and bought a 12 dollar smart plug.
 
 # How It Works
 
@@ -23,6 +28,28 @@ TV off is 0.393W +/- 0.074W and TV on is 33.500W +/- 12.516W (spiking to 91W whe
 Just kidding, TV also sometimes randomly spikes to 10.281W +/- 0.146W after powering off because (???)[^fire]. So `sub_threshold` is 15W.
 
 [^fire]: If I perish in an electrical fire, you may point and laugh at this footnote.
+
+## The Display
+
+By dumping the TV's EDID and permanently forcing it at the kernel level, the system always sees a valid, connected display at that port.
+
+This transforms a single HDMI cable into a hybrid headless and physical output[^dummy]. The OS maintains a permanent rendering target for remote streaming[^sunshine] regardless of the TV's actual power state, yet also acts as a normal local display if I turn it on with the remote. No mode switching or display profile management required :D
+
+[^dummy]: Dummy HDMI plugs give you a permanent headless target but sacrifice the physical display entirely. This method provides both on one port, using the smart plug to bridge the gap by tracking the TV's true hardware state.
+
+[^sunshine]: Anything that supports Moonlight; a jailbroken WebOS TV running Moonlight natively (the TV remote doubles as a mouse, Wii remote-style; I've played a fair amount of Old School Runescape this way and it's so goofy), a jailbroken Switch, or my phone in bed.
+
+The implementation requires dumping the EDID once and forcing it via a GRUB kernel parameter:
+
+```bash
+sudo cat /sys/class/drm/card1-HDMI-A-4/edid > /lib/firmware/edid/tv.bin
+```
+
+```
+/etc/grub/default
+---
+GRUB_CMDLINE_LINUX_DEFAULT="... drm.edid_firmware=HDMI-A-4:edid/tv.bin video=HDMI-A-4:e ..."
+```
 
 ## The Server
 
