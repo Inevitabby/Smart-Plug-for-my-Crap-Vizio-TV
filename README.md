@@ -1,10 +1,10 @@
 # Smart Plug for my Crap Vizio TV
 
-My crap Vizio TV doesn't support HDMI HPD and there's literally no way in software to tell whether the TV is on or off.
+My Vizio TV doesn't support HDMI HPD, so there's no clean way in software to tell whether it's on or off.
 
-I checked dmesg and Pipewire, I tried probing it on the network, I tried hooking a Gen 1 Tinkerboard running an extremely optimized DietPi setup to the TV's USB port (to serve as a beacon, because the USB port briefly got power on power-on)[^dietpi] nothing worked. 
+I ran through the usual diagnostics first (dmesg, PipeWire, probing it on the network), then escalated to increasingly unhinged ideas, including wiring a Gen 1 Tinkerboard running an extremely optimized DietPi setup into the TV's USB port to act as a power-on beacon[^dietpi]. Eventually I did the sane thing and bought a $12 smart plug.
 
-[^dietpi]: it frequently browned-out or didn't boot fast-enough
+[^dietpi]: It frequently browned-out or didn't boot fast-enough; the TV's USB port turned out to be extremely spotty
 
 After wasting several hours I just went with the obvious solution and bought a 12 dollar smart plug.
 
